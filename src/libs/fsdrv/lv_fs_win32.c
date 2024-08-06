@@ -315,8 +315,8 @@ static lv_fs_res_t fs_seek(lv_fs_drv_t * drv, void * file_p, uint32_t pos, lv_fs
 /**
  * Give the position of the read write pointer
  * @param drv       pointer to a driver where this function belongs
- * @param file_p    pointer to a FILE variable.
- * @param pos_p     pointer to to store the result
+ * @param file_p    pointer to a FILE variable
+ * @param pos_p     pointer to store the result
  * @return LV_FS_RES_OK: no error, the file is read
  *         any error from lv_fs_res_t enum
  */
@@ -413,8 +413,10 @@ static void * fs_dir_open(lv_fs_drv_t * drv, const char * path)
 static lv_fs_res_t fs_dir_read(lv_fs_drv_t * drv, void * dir_p, char * fn, uint32_t fn_len)
 {
     LV_UNUSED(drv);
+    if(fn_len == 0) return LV_FS_RES_INV_PARAM;
+
     dir_handle_t * handle = (dir_handle_t *)dir_p;
-    lv_strcpy(fn, handle->next_fn);
+    lv_strlcpy(fn, handle->next_fn, fn_len);
     lv_fs_res_t current_error = handle->next_error;
     lv_strcpy(handle->next_fn, "");
 

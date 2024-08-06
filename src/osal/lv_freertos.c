@@ -16,9 +16,13 @@
 
 #if LV_USE_OS == LV_OS_FREERTOS
 
-#include "atomic.h"
-#include "../misc/lv_log.h"
+#if (ESP_PLATFORM)
+    #include "freertos/atomic.h"
+#else
+    #include "atomic.h"
+#endif
 
+#include "../misc/lv_log.h"
 /*********************
  *      DEFINES
  *********************/
@@ -55,9 +59,21 @@ static void prvTestAndDecrement(lv_thread_sync_t * pxCond,
  *  STATIC VARIABLES
  **********************/
 
+#if (ESP_PLATFORM)
+    static portMUX_TYPE critSectionMux = portMUX_INITIALIZER_UNLOCKED;
+#endif
+
 /**********************
  *      MACROS
  **********************/
+
+#if (ESP_PLATFORM)
+    #define _enter_critical()   taskENTER_CRITICAL(&critSectionMux);
+    #define _exit_critical()    taskEXIT_CRITICAL(&critSectionMux);
+#else
+    #define _enter_critical()   taskENTER_CRITICAL();
+    #define _exit_critical()    taskEXIT_CRITICAL();
+#endif
 
 /**********************
  *   GLOBAL FUNCTIONS
@@ -302,6 +318,36 @@ lv_result_t lv_thread_sync_delete(lv_thread_sync_t * pxCond)
     return LV_RESULT_OK;
 }
 
+lv_result_t lv_thread_sync_signal_isr(lv_thread_sync_t * pxCond)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+#if USE_FREERTOS_TASK_NOTIFY
+    /* Send a notification to the task waiting. */
+    vTaskNotifyGiveFromISR(pxCond->xTaskToNotify, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+#else
+    /* If the cond is uninitialized, perform initialization. */
+    prvCheckCondInit(pxCond);
+
+    /* Enter critical section to prevent preemption. */
+    _enter_critical();
+
+    pxCond->xSyncSignal = pdTRUE;
+    BaseType_t xAnyHigherPriorityTaskWoken = pdFALSE;
+
+    /* Unblock all. */
+    for(uint32_t i = 0; i < pxCond->ulWaitingThreads; i++) {
+        xSemaphoreGiveFromISR(pxCond->xCondWaitSemaphore, &xAnyHigherPriorityTaskWoken);
+        xHigherPriorityTaskWoken |= xAnyHigherPriorityTaskWoken;
+    }
+
+    _exit_critical();
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+#endif
+
+    return LV_RESULT_OK;
+}
+
 /**********************
  *   STATIC FUNCTIONS
  **********************/
@@ -318,7 +364,7 @@ static void prvRunThread(void * pxArg)
 
 static void prvMutexInit(lv_mutex_t * pxMutex)
 {
-    pxMutex->xMutex = xSemaphoreCreateMutex();
+    pxMutex->xMutex = xSemaphoreCreateRecursiveMutex();
 
     /* Ensure that the FreeRTOS mutex was successfully created. */
     if(pxMutex->xMutex == NULL) {
@@ -336,7 +382,7 @@ static void prvCheckMutexInit(lv_mutex_t * pxMutex)
     if(pxMutex->xIsInitialized == pdFALSE) {
         /* Mutex initialization must be in a critical section to prevent two threads
          * from initializing it at the same time. */
-        taskENTER_CRITICAL();
+        _enter_critical();
 
         /* Check again that the mutex is still uninitialized, i.e. it wasn't
          * initialized while this function was waiting to enter the critical
@@ -346,7 +392,7 @@ static void prvCheckMutexInit(lv_mutex_t * pxMutex)
         }
 
         /* Exit the critical section. */
-        taskEXIT_CRITICAL();
+        _exit_critical();
     }
 }
 
@@ -385,7 +431,7 @@ static void prvCheckCondInit(lv_thread_sync_t * pxCond)
     if(pxCond->xIsInitialized == pdFALSE) {
         /* Cond initialization must be in a critical section to prevent two
          * threads from initializing it at the same time. */
-        taskENTER_CRITICAL();
+        _enter_critical();
 
         /* Check again that the condition is still uninitialized, i.e. it wasn't
          * initialized while this function was waiting to enter the critical
@@ -395,7 +441,7 @@ static void prvCheckCondInit(lv_thread_sync_t * pxCond)
         }
 
         /* Exit the critical section. */
-        taskEXIT_CRITICAL();
+        _exit_critical();
     }
 }
 

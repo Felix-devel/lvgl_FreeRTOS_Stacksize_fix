@@ -29,13 +29,6 @@ extern "C" {
  **********************/
 LV_ATTRIBUTE_EXTERN_DATA extern const lv_obj_class_t lv_canvas_class;
 
-/*Data of canvas*/
-typedef struct {
-    lv_image_t img;
-    lv_draw_buf_t * draw_buf;
-    lv_draw_buf_t static_buf;
-} lv_canvas_t;
-
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
@@ -68,7 +61,7 @@ void lv_canvas_set_buffer(lv_obj_t * obj, void * buf, int32_t w, int32_t h, lv_c
 
 /**
  * Set a draw buffer for the canvas. A draw buffer either can be allocated by `lv_draw_buf_create()`
- * or defined statically by `LV_DRAW_BUF_DEFINE`. When buffer start address and stride has alignment
+ * or defined statically by `LV_DRAW_BUF_DEFINE_STATIC`. When buffer start address and stride has alignment
  * requirement, it's recommended to use `lv_draw_buf_create`.
  * @param obj       pointer to a canvas object
  * @param draw_buf  pointer to a draw buffer
@@ -91,15 +84,15 @@ void lv_canvas_set_px(lv_obj_t * obj, int32_t x, int32_t y, lv_color_t color, lv
 
 /**
  * Set the palette color of a canvas for index format. Valid only for `LV_COLOR_FORMAT_I1/2/4/8`
- * @param canvas    pointer to canvas object
- * @param id        the palette color to set:
+ * @param obj       pointer to canvas object
+ * @param index     the palette color to set:
  *                  - for `LV_COLOR_FORMAT_I1`: 0..1
  *                  - for `LV_COLOR_FORMAT_I2`: 0..3
  *                  - for `LV_COLOR_FORMAT_I4`: 0..15
  *                  - for `LV_COLOR_FORMAT_I8`: 0..255
- * @param c         the color to set
+ * @param color     the color to set
  */
-void lv_canvas_set_palette(lv_obj_t * canvas, uint8_t id, lv_color32_t c);
+void lv_canvas_set_palette(lv_obj_t * obj, uint8_t index, lv_color32_t color);
 
 /*=====================
  * Getter functions
@@ -179,10 +172,7 @@ void lv_canvas_finish_layer(lv_obj_t * canvas, lv_layer_t * layer);
 /**
  * Just a wrapper to `LV_CANVAS_BUF_SIZE` for bindings.
  */
-static inline uint32_t lv_canvas_buf_size(int32_t w, int32_t h, uint8_t bpp, uint8_t stride)
-{
-    return (uint32_t)LV_CANVAS_BUF_SIZE(w, h, bpp, stride);
-}
+uint32_t lv_canvas_buf_size(int32_t w, int32_t h, uint8_t bpp, uint8_t stride);
 
 #endif /*LV_USE_CANVAS*/
 
